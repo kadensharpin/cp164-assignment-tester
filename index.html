@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>CP164 Assignment Validator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://pyscript.net/releases/2025.11.2/core.css"
+    />
+    <script>
+      window.scriptRunDelay = 300; // ms
+    </script>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      }
+
+      body.loading > .loader-wrapper {
+        opacity: 1;
+        pointer-events: unset;
+      }
+
+      .loader-wrapper {
+        opacity: 0;
+        pointer-events: none;
+
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #eee;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+
+      .loader {
+        border: 8px solid #d3d3d3;
+        border-top: 8px solid #333;
+        border-radius: 50%;
+        width: 70px;
+        height: 70px;
+        animation: spin 1.5s linear infinite;
+        margin-bottom: 20px;
+      }
+
+      .loading-text {
+        color: #333;
+        font-size: 18px;
+        font-weight: 500;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+
+        animation: pulseText 2s ease-in-out infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes pulseText {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+    </style>
+    <style>
+      .test-icon {
+        padding-right: 0.5rem;
+        fill: none;
+        width: 60px;
+        height: 60px;
+
+        & > circle {
+          stroke: #27262b;
+        }
+        & > path {
+          transform-origin: 50% -50%;
+          fill: none;
+
+          &:first-of-type {
+            transform: rotate(45deg) translate(-130px, 130px) scaleX(0);
+            transition: transform 100ms;
+          }
+          &:nth-of-type(2) {
+            transform: rotate(45deg) translate(-130px, 130px) scaleY(0);
+            transition: transform 100ms 100ms;
+          }
+          &:nth-of-type(3) {
+            transform: rotate(45deg) translate(-160px, 155px) scaleX(0);
+            transition: transform 100ms;
+          }
+          &:nth-of-type(4) {
+            transform: rotate(135deg) translate(-165px, 150px) scaleX(0);
+            transition: transform 100ms;
+          }
+        }
+      }
+      .test-icon.checked {
+        & > circle {
+          stroke: #24db2d;
+
+          transform-origin: 50% -50%;
+          transform: rotate(250deg);
+          /* animation: circle 200ms ease-out; */
+        }
+        & > path {
+          &:first-of-type {
+            fill: #24db2d;
+            transform: rotate(45deg) translate(-130px, 130px) scaleX(1);
+          }
+          &:nth-of-type(2) {
+            fill: #24db2d;
+            transform: rotate(45deg) translate(-130px, 130px) scaleY(1);
+          }
+        }
+      }
+      .test-icon.failed {
+        & > circle {
+          stroke: #d82323;
+
+          transform-origin: 50% -50%;
+          transform: rotate(250deg);
+          /* animation: circle 200ms ease-out; */
+        }
+        & > path {
+          &:nth-of-type(3) {
+            fill: #d82323;
+            transform: rotate(45deg) translate(-160px, 155px) scaleX(1);
+          }
+          &:nth-of-type(4) {
+            fill: #d82323;
+            transform: rotate(135deg) translate(-165px, 150px) scaleX(1);
+          }
+        }
+      }
+
+      @keyframes circle {
+        from {
+          stroke-dasharray: 1884;
+          stroke-dashoffset: 1884;
+        }
+        to {
+          stroke-dasharray: 1884;
+          stroke-dashoffset: 0;
+        }
+      }
+    </style>
+    <style>
+      main {
+        height: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 7fr 3fr;
+        gap: 1px;
+        background-color: #e0e0e0;
+
+        & > :last-child {
+          /* Terminal */
+          grid-column: span 2;
+        }
+        & > * {
+          background-color: #fff;
+        }
+      }
+      .header {
+        text-align: center;
+        letter-spacing: 1px;
+        font-weight: normal;
+        font-size: 35px;
+      }
+      .assignment > div {
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+
+        & > label {
+          font-size: 20px;
+          text-transform: uppercase;
+          font-weight: bold;
+          letter-spacing: 2px;
+        }
+
+        & > select {
+          padding: 12px 20px;
+          background: #fff;
+          border: black solid 2px;
+          font-size: 16px;
+        }
+      }
+      .tasks {
+        overflow-y: auto;
+      }
+      #task-list {
+        padding: 0;
+        margin: 0;
+
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+
+        & > li {
+          height: 80px;
+          display: grid;
+          padding-inline: 15px;
+          grid-template-columns: 80px 1fr;
+          grid-template-rows: 1fr 1fr;
+          align-items: center;
+          justify-content: center;
+
+          & > svg {
+            grid-row: span 2;
+          }
+
+          & > span:first-of-type {
+            font-size: 20px;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 2px;
+            align-self: end;
+          }
+        }
+      }
+    </style>
+  </head>
+  <body class="loading">
+    <div class="loader-wrapper">
+      <div class="loader"></div>
+      <div class="loading-text">Loading...</div>
+    </div>
+
+    <main>
+      <div class="assignment">
+        <p class="header">Assignment</p>
+        <div>
+          <label for="assignment-picker">Assignment</label>
+          <select id="assignment-picker">
+            <option selected>(No Assignment Selected)</option>
+          </select>
+        </div>
+        <div>
+          <label for="file-picker">File</label>
+          <input type="file" id="file-picker" disabled />
+        </div>
+      </div>
+      <div class="tasks">
+        <p class="header">Tasks</p>
+        <ul id="task-list"></ul>
+      </div>
+      <div>
+        <script type="py" terminal src="./index.py"></script>
+      </div>
+    </main>
+
+    <script type="module">
+      import { hooks } from "https://pyscript.net/releases/2025.11.2/core.js";
+
+      hooks.main.onReady.add(() => {
+        document.body.classList.remove("loading");
+      });
+
+      /** @type {HTMLSelectElement} */
+      const assignmentPicker = document.getElementById("assignment-picker");
+      /** @type {HTMLInputElement} */
+      const filePicker = document.getElementById("file-picker");
+      const taskList = document.getElementById("task-list");
+
+      /** @typedef {{number:number,name:string,code:string}} Task */
+      /** @typedef {{[name: string]:Task[]}} Assignments */
+      /** @type {Assignments} */
+      const assignments = await fetch("./assignments.json").then((res) =>
+        res.json()
+      );
+
+      for (const [name, tasks] of Object.entries(assignments)) {
+        const option = document.createElement("option");
+        option.text = name;
+        assignmentPicker.appendChild(option);
+      }
+      assignmentPicker.addEventListener("change", (ev) => {
+        window.clearTerminal();
+        while (taskList.firstElementChild) {
+          taskList.firstElementChild.remove();
+        }
+        filePicker.disabled = true;
+        const tasks = assignments[assignmentPicker.value];
+        if (!tasks) return;
+        filePicker.disabled = false;
+        for (const task of tasks.sort((a, b) => a.number - b.number)) {
+          const li = document.createElement("li");
+
+          const icon = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -700 700 700" class="test-icon">
+            <circle cx="350" cy="-350" r="300" id="outline" stroke-width="70" />
+            <path d="M491.3-389.5H330.1v79.2h240.4z" />
+            <path d="M491.3-389.5V-709.1h79.2v398.8Z" />
+            <path d="M490-309v-398.8h79.2v398.8Z" />
+            <path d="M490-309v-398.8h79.2v398.8Z" />
+          </svg>`;
+          li.insertAdjacentHTML("afterbegin", icon);
+
+          const taskNum = document.createElement("span");
+          taskNum.innerText = "Task #" + task.number;
+          li.appendChild(taskNum);
+
+          const taskName = document.createElement("span");
+          taskName.innerText = task.name;
+          li.appendChild(taskName);
+
+          taskList.appendChild(li);
+        }
+      });
+
+      filePicker.addEventListener("change", async (ev) => {
+        const tasks = assignments[assignmentPicker.value]?.sort(
+          (a, b) => a.number - b.number
+        );
+        if (!tasks) return;
+
+        assignmentPicker.disabled = true;
+        filePicker.disabled = true;
+
+        if (filePicker.files.length > 0) {
+          const icons = {};
+          for (const task of tasks) {
+            for (const el of taskList.children) {
+              if (
+                el.children[1].innerText.toLowerCase() ===
+                "task #" + task.number
+              ) {
+                icons[task.number] = el.firstElementChild;
+                icons[task.number].classList.remove("failed", "checked");
+                break;
+              }
+            }
+          }
+          try {
+            window.clearTerminal();
+            let file = await filePicker.files[0].text();
+            file = fixFile(file);
+            for (const task of tasks) {
+              try {
+                window.runScript(file + "\n\n" + task.code);
+                icons[task.number]?.classList.add("checked");
+                await new Promise((s) => setTimeout(s, window.scriptRunDelay));
+              } catch (err) {
+                icons[task.number]?.classList.add("failed");
+                throw err;
+              }
+            }
+          } catch (err) {
+            console.error(err);
+            window.runScript(`print(${JSON.stringify(err.toString())})`);
+          }
+        }
+
+        assignmentPicker.disabled = false;
+        filePicker.disabled = false;
+        filePicker.value = "";
+      });
+
+      function fixFile(contents) {
+        // This is only required because of a bug in pyodide
+        // Global variables aren't able to be set in exec()
+        const lines = contents.split("\n");
+        const globals = [];
+        for (const line of lines) {
+          if (/^\s/.test(line)) continue;
+          if (!/^\w+\s*=/.test(line)) continue;
+          globals.push(line);
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!/^def\s+/.test(line)) continue;
+          let nextLine = lines[i + 1];
+          let i2 = 2;
+          while (nextLine !== undefined && nextLine.length === 0) {
+            nextLine = lines[i + i2++];
+          }
+          if (!nextLine) break;
+          const indent = nextLine.replace(/^(\s+).*$/, "$1");
+
+          lines.splice(
+            i + 1,
+            0,
+            ...globals.map((variable) => indent + variable)
+          );
+          i += globals.length;
+        }
+        return lines.join("\n");
+      }
+    </script>
+  </body>
+</html>
