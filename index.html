@@ -14,6 +14,10 @@
       rel="stylesheet"
       href="https://pyscript.net/releases/2025.11.2/core.css"
     />
+    <script
+      src="https://pyscript.net/releases/2025.11.2/core.js"
+      type="module"
+    ></script>
     <script>
       window.scriptRunDelay = 300; // ms
     </script>
@@ -281,11 +285,12 @@
     </main>
 
     <script type="module">
-      import { hooks } from "https://pyscript.net/releases/2025.11.2/core.js";
-
-      hooks.main.onReady.add(() => {
+      let fulfillPythonPromise;
+      const python = new Promise((s) => (fulfillPythonPromise = s));
+      window.onPythonReady = () => {
         document.body.classList.remove("loading");
-      });
+        fulfillPythonPromise();
+      };
 
       /** @type {HTMLSelectElement} */
       const assignmentPicker = document.getElementById("assignment-picker");
@@ -294,11 +299,20 @@
       const taskList = document.getElementById("task-list");
 
       /** @typedef {{number:number,name:string,code:string}} Task */
-      /** @typedef {{[name: string]:Task[]}} Assignments */
+      /** @typedef {{assignments:{[name: string]:Task[]},modules:{[name: string]:string},files:{[name: string]:string}}} Assignments */
       /** @type {Assignments} */
-      const assignments = await fetch("./assignments.json").then((res) =>
-        res.json()
-      );
+      const { assignments, modules, files } = await fetch(
+        "./assignments.json"
+      ).then((res) => res.json());
+
+      python.then(() => {
+        for (const [name, code] of Object.entries(modules)) {
+          window.createFile(name + ".py", code);
+        }
+        for (const [name, contents] of Object.entries(files)) {
+          window.createFile(name, contents);
+        }
+      });
 
       for (const [name, tasks] of Object.entries(assignments)) {
         const option = document.createElement("option");
@@ -364,11 +378,12 @@
           }
           try {
             window.clearTerminal();
-            let file = await filePicker.files[0].text();
-            file = fixFile(file);
+            const file = filePicker.files[0];
+            window.createFile(file.name, await file.text());
+
             for (const task of tasks) {
               try {
-                window.runScript(file + "\n\n" + task.code);
+                window.runScript(task.code);
                 icons[task.number]?.classList.add("checked");
                 await new Promise((s) => setTimeout(s, window.scriptRunDelay));
               } catch (err) {
@@ -386,37 +401,6 @@
         filePicker.disabled = false;
         filePicker.value = "";
       });
-
-      function fixFile(contents) {
-        // This is only required because of a bug in pyodide
-        // Global variables aren't able to be set in exec()
-        const lines = contents.split("\n");
-        const globals = [];
-        for (const line of lines) {
-          if (/^\s/.test(line)) continue;
-          if (!/^\w+\s*=/.test(line)) continue;
-          globals.push(line);
-        }
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (!/^def\s+/.test(line)) continue;
-          let nextLine = lines[i + 1];
-          let i2 = 2;
-          while (nextLine !== undefined && nextLine.length === 0) {
-            nextLine = lines[i + i2++];
-          }
-          if (!nextLine) break;
-          const indent = nextLine.replace(/^(\s+).*$/, "$1");
-
-          lines.splice(
-            i + 1,
-            0,
-            ...globals.map((variable) => indent + variable)
-          );
-          i += globals.length;
-        }
-        return lines.join("\n");
-      }
     </script>
   </body>
 </html>

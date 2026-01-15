@@ -2,18 +2,20 @@ from pyscript import window, ffi
 import io
 
 
-def runScript(script):
+def run_script(script):
     exec(script)
 
 
-def clearTerminal():
+def clear_terminal():
     __terminal__.clear()
 
 
-window.runScript = ffi.create_proxy(runScript)
-window.clearTerminal = ffi.create_proxy(clearTerminal)
+def create_file(file_name, file_contents):
+    with open(file_name, 'wt', encoding='utf8') as f:
+        f.write(file_contents)
 
 
-def emulate_file(text):
-	binary_file = io.BytesIO(text.encode('utf8'))
-	return io.TextIOWrapper(binary_file, encoding='utf8')
+window.runScript = ffi.create_proxy(run_script)
+window.clearTerminal = ffi.create_proxy(clear_terminal)
+window.createFile = ffi.create_proxy(create_file)
+window.onPythonReady()
