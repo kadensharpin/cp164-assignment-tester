@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -302,7 +302,7 @@
       /** @typedef {{assignments:{[name: string]:Task[]},modules:{[name: string]:string},files:{[name: string]:string}}} Assignments */
       /** @type {Assignments} */
       const { assignments, modules, files } = await fetch(
-        "./assignments.json"
+        "./assignments.json",
       ).then((res) => res.json());
 
       python.then(() => {
@@ -355,7 +355,7 @@
 
       filePicker.addEventListener("change", async (ev) => {
         const tasks = assignments[assignmentPicker.value]?.sort(
-          (a, b) => a.number - b.number
+          (a, b) => a.number - b.number,
         );
         if (!tasks) return;
 
@@ -388,7 +388,8 @@
                 await new Promise((s) => setTimeout(s, window.scriptRunDelay));
               } catch (err) {
                 icons[task.number]?.classList.add("failed");
-                throw err;
+                console.error(err);
+                window.runScript(`print(${JSON.stringify(err.toString())})`);
               }
             }
           } catch (err) {
