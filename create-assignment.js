@@ -1,8 +1,8 @@
 //@ts-check
-/** @typedef {{number:number,name:string,code:string}} Task */
-/** @typedef {{files:string[],tasks:Task[]}} Assignment */
-/** @typedef {{assignments:{[name: string]:Assignment},modules:{[name: string]:string},files:{[name: string]:string}}} Assignments */
-/** @typedef {(assignments:Assignments,args:string[]) => Promise<void>} Action */
+/**
+ * @import {Assignments,Task} from "./index.d.ts"
+ * @import {Action} from "./create-assignment.d.ts"
+ */
 
 const ASSIGNMENT = "assignment";
 const MODULE = "module";
