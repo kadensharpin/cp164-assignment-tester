@@ -207,11 +207,13 @@
         flex-direction: column;
         padding: 16px;
 
-        & > label {
+        & > label,
+        & > p {
           font-size: 20px;
           text-transform: uppercase;
           font-weight: bold;
           letter-spacing: 2px;
+          margin: 0;
         }
 
         & > select {
@@ -253,6 +255,18 @@
           }
         }
       }
+      #file-list {
+        padding: 0;
+        margin: 0;
+
+        & > li {
+          display: grid;
+          padding: 15px;
+          grid-template-columns: 1fr 1fr;
+          align-items: center;
+          justify-content: center;
+        }
+      }
     </style>
   </head>
   <body class="loading">
@@ -271,8 +285,8 @@
           </select>
         </div>
         <div>
-          <label for="file-picker">File</label>
-          <input type="file" id="file-picker" disabled />
+          <p>Files</p>
+          <ul id="file-list"></ul>
         </div>
       </div>
       <div class="tasks">
@@ -294,12 +308,14 @@
 
       /** @type {HTMLSelectElement} */
       const assignmentPicker = document.getElementById("assignment-picker");
-      /** @type {HTMLInputElement} */
-      const filePicker = document.getElementById("file-picker");
+      /** @type {HTMLUListElement} */
+      const fileList = document.getElementById("file-list");
+      /** @type {HTMLUListElement} */
       const taskList = document.getElementById("task-list");
 
       /** @typedef {{number:number,name:string,code:string}} Task */
-      /** @typedef {{assignments:{[name: string]:Task[]},modules:{[name: string]:string},files:{[name: string]:string}}} Assignments */
+      /** @typedef {{files:string[],tasks:Task[]}} Assignment */
+      /** @typedef {{assignments:{[name: string]:Assignment},modules:{[name: string]:string},files:{[name: string]:string}}} Assignments */
       /** @type {Assignments} */
       const { assignments, modules, files } = await fetch(
         "./assignments.json",
@@ -324,11 +340,13 @@
         while (taskList.firstElementChild) {
           taskList.firstElementChild.remove();
         }
-        filePicker.disabled = true;
-        const tasks = assignments[assignmentPicker.value];
-        if (!tasks) return;
-        filePicker.disabled = false;
-        for (const task of tasks.sort((a, b) => a.number - b.number)) {
+        while (fileList.firstElementChild) {
+          fileList.firstElementChild.remove();
+        }
+        const assignment = assignments[assignmentPicker.value];
+        if (!assignment) return;
+        const tasks = assignment.tasks.sort((a, b) => a.number - b.number);
+        for (const task of tasks) {
           const li = document.createElement("li");
 
           const icon = `
@@ -351,57 +369,102 @@
 
           taskList.appendChild(li);
         }
+        let id = 1;
+        for (const filename of assignment.files) {
+          const li = document.createElement("li");
+          const label = document.createElement("label");
+          label.innerText = filename;
+          li.appendChild(label);
+
+          const input = document.createElement("input");
+          input.type = "file";
+          input.id = `file-input-${id++}`;
+          input.addEventListener("change", onFileChange);
+          label.htmlFor = input.id;
+          li.appendChild(input);
+
+          fileList.appendChild(li);
+        }
       });
 
-      filePicker.addEventListener("change", async (ev) => {
-        const tasks = assignments[assignmentPicker.value]?.sort(
+      /** @param {Event} ev */
+      async function onFileChange(ev) {
+        /** @type {HTMLInputElement} */
+        const filePicker = ev.target;
+        const file = filePicker.files[0];
+        if (!file) return;
+        const label = filePicker.labels?.[0];
+        if (label?.innerText !== file.name) {
+          alert(`File must be named '${label.innerText}'`);
+          filePicker.value = "";
+          return;
+        }
+        try {
+          window.createFile(file.name, await file.text());
+        } catch (err) {
+          console.error(err);
+          window.runScript(`print(${JSON.stringify(err.toString())})`);
+        }
+        const inputs = Array.from(fileList.querySelectorAll("input"));
+        if (inputs.every((input) => input.files[0])) {
+          await runTests();
+        }
+      }
+
+      async function runTests() {
+        const tasks = assignments[assignmentPicker.value]?.tasks.sort(
           (a, b) => a.number - b.number,
         );
         if (!tasks) return;
-
-        assignmentPicker.disabled = true;
-        filePicker.disabled = true;
-
-        if (filePicker.files.length > 0) {
-          const icons = {};
-          for (const task of tasks) {
-            for (const el of taskList.children) {
-              if (
-                el.children[1].innerText.toLowerCase() ===
-                "task #" + task.number
-              ) {
-                icons[task.number] = el.firstElementChild;
-                icons[task.number].classList.remove("failed", "checked");
-                break;
-              }
+        enableInputs(false);
+        const icons = {};
+        for (const task of tasks) {
+          for (const el of taskList.children) {
+            if (
+              el.children[1].innerText.toLowerCase() ===
+              "task #" + task.number
+            ) {
+              icons[task.number] = el.firstElementChild;
+              icons[task.number].classList.remove("failed", "checked");
+              break;
             }
           }
-          try {
-            window.clearTerminal();
-            const file = filePicker.files[0];
-            window.createFile(file.name, await file.text());
+        }
+        window.clearTerminal();
+        const inputs = fileList.querySelectorAll("input");
+        const filenames = Array.from(inputs, (input) =>
+          input.files[0].name.slice(0, -3),
+        );
 
-            for (const task of tasks) {
-              try {
-                window.runScript(task.code);
-                icons[task.number]?.classList.add("checked");
-                await new Promise((s) => setTimeout(s, window.scriptRunDelay));
-              } catch (err) {
-                icons[task.number]?.classList.add("failed");
-                console.error(err);
-                window.runScript(`print(${JSON.stringify(err.toString())})`);
-              }
-            }
+        const imports = `from importlib import reload\n${filenames.map((f) => `import ${f}`).join("\n")}\n`;
+        const reloads = filenames.map((f) => `reload(${f})`).join("\n");
+        try {
+          window.runScript(`${imports}\n${reloads}`);
+        } catch (err) {
+          console.error(err);
+          window.runScript(`print(${JSON.stringify(err.toString())})`);
+          return;
+        }
+        for (const task of tasks) {
+          try {
+            window.runScript(task.code);
+            icons[task.number]?.classList.add("checked");
+            await new Promise((s) => setTimeout(s, window.scriptRunDelay));
           } catch (err) {
+            icons[task.number]?.classList.add("failed");
             console.error(err);
             window.runScript(`print(${JSON.stringify(err.toString())})`);
           }
         }
+        enableInputs(true);
+      }
 
-        assignmentPicker.disabled = false;
-        filePicker.disabled = false;
-        filePicker.value = "";
-      });
+      function enableInputs(enabled) {
+        for (const input of fileList.querySelectorAll("input")) {
+          input.disabled = !enabled;
+        }
+        assignmentPicker.disabled = !enabled;
+      }
     </script>
   </body>
 </html>

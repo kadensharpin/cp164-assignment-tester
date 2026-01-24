@@ -1,6 +1,7 @@
 //@ts-check
 /** @typedef {{number:number,name:string,code:string}} Task */
-/** @typedef {{assignments:{[name: string]:Task[]},modules:{[name: string]:string},files:{[name: string]:string}}} Assignments */
+/** @typedef {{files:string[],tasks:Task[]}} Assignment */
+/** @typedef {{assignments:{[name: string]:Assignment},modules:{[name: string]:string},files:{[name: string]:string}}} Assignments */
 /** @typedef {(assignments:Assignments,args:string[]) => Promise<void>} Action */
 
 const ASSIGNMENT = "assignment";
@@ -62,7 +63,7 @@ async function createAssignment(assignments, args) {
   }
 
   const name = getNextAssignmentName(assignments);
-  assignments.assignments[name] = tasks;
+  assignments.assignments[name] = { tasks, files: ["functions.py"] };
 }
 
 /** @param {Assignments} assignments */
@@ -87,8 +88,8 @@ async function readTasks(inputDir) {
     filenames.map((filename) =>
       fs
         .readFile(path.resolve(inputDir, filename), "utf8")
-        .then((contents) => [filename, contents])
-    )
+        .then((contents) => [filename, contents]),
+    ),
   );
   return files.map(([filename, contents]) => readTask(filename, contents));
 }
